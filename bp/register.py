@@ -85,7 +85,7 @@ async def send_email_route():
                      
 Thanks for signing up for CraftJobs!
 {body}
-https://craftjobs.net/i/{link}{token}.
+https://craftjobs.net/i/{link}{token}
 
 If you did not request this message, you can safely ignore it.
 
