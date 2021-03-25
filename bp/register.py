@@ -18,6 +18,7 @@ async def send_email_route():
     request: Request = quart_rq
 
     json = await request.get_json()
+    no_send_on_no_acc = 'f' in request.args
 
     if 'email' not in json:
         return {'message': 'Missing email.'}
@@ -30,15 +31,33 @@ async def send_email_route():
     if '@' not in email:
         return {'message': 'Invalid email.'}
 
-    if await g.redis.exists('ratelimit:register:send_mail:' + email):
+    if await g.redis.exists('ratelimit:register:send_mail:' + email.lower()):
         return {'message': 'You can only do this once every 10 minutes.'}
 
     token = token_hex(32)
     device_token = token_hex(32)
 
-    await g.redis.setex('register:email_token:' + token, 600, email)
+    key = 'register:email_token:'
+    title = 'Verify your email'
+    body = 'You can finish your registration here'
+    link = 'register/finish/'
+    is_reset = False
+
+    async with g.pool.acquire() as con:
+        con: asyncpg.Connection = con
+        if await con.fetchval(
+                'SELECT COUNT(email) FROM users WHERE email = $1',
+                email.lower()):
+            key = 'login:password_reset:'
+            title = 'Reset your password'
+            body = 'You already have an account, you can reset your ' \
+                   'password here:'
+            link = 'login/change-password?t='
+            is_reset = True
+
+    await g.redis.setex(key + token, 600, email.lower())
     await g.redis.setex('register:device_token:' + device_token, 600, token)
-    await g.redis.setex('ratelimit:register:send_mail:' + email, 600, 'a')
+    await g.redis.setex('ratelimit:register:send_mail:' + email.lower(), 600, 'a')
 
     http: http3.AsyncClient = g.http
     success = (await http.post('https://hcaptcha.com/siteverify', data={
@@ -60,14 +79,15 @@ async def send_email_route():
             email = await g.redis.get(key)
             await g.redis.delete(key)
 
-    # TODO: CHECK FOR USER HERE ONCE USERS EXIST
-
-    send_mail(email, '[CraftJobs] Verify your email',
-                     f"""Dear user,
+    if not (no_send_on_no_acc and not is_reset):
+        send_mail(email, f'[CraftJobs] {title}',
+                         f"""Dear user,
                      
 Thanks for signing up for CraftJobs!
-You can finish your registration here: 
-https://craftjobs.net/i/register/finish/{token}.
+{body}
+https://craftjobs.net/i/{link}{token}.
+
+If you did not request this message, you can safely ignore it.
 
 Much Love,
 - The CraftJobs Team
