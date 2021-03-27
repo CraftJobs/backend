@@ -66,11 +66,6 @@ async def get_user(username: str):
             return no('not_found')
 
         user_id = db_user['id']
-
-        db_looking_for = await con.fetch(
-            'SELECT looking_for_type FROM looking_for WHERE user_id = $1',
-            user_id)
-
         rate_lower = db_user['rate_lower']
         rate_higher = db_user['rate_higher']
         rate_range = []
@@ -136,8 +131,7 @@ async def get_user(username: str):
             'avatarUrl': db_user['avatar_url'],
             'fullName': db_user['full_name'],
             'username': db_user['username'],
-            'lookingFor': list(filter(lambda x: x['looking_for_type'],
-                                      db_looking_for)),
+            'lookingFor': [],  # TODO
             'rateRange': rate_range,
             'reputation': total_rep,
             'role': db_user['role'],
@@ -321,15 +315,21 @@ async def edit_me():
                     if con_key not in CONNECTION_VALIDATORS:
                         return no('Invalid connection: ' + con_key + '.')
 
-                    if not CONNECTION_VALIDATORS[con_key](con_val):
-                        return no('Invalid ' + con_key.lower())
+                    if con_val == '':
+                        await con.execute('DELETE FROM connections WHERE ' +
+                                          'connection_type = $1 ' +
+                                          'AND user_id = $2', con_key, user_id)
+                    else:
+                        if not CONNECTION_VALIDATORS[con_key](con_val):
+                            return no('Invalid ' + con_key.lower())
 
-                    await con.execute('INSERT INTO connections (id, ' +
-                                      'user_id, connection_type, link) ' +
-                                      'VALUES ($1, $2, $3, $4) ON CONFLICT ' +
-                                      '(user_id, connection_type) DO UPDATE ' +
-                                      'SET link = $4', uuid4(), user_id,
-                                      con_key, con_val)
+                        await con.execute('INSERT INTO connections (id, ' +
+                                          'user_id, connection_type, link) ' +
+                                          'VALUES ($1, $2, $3, $4) ON ' +
+                                          'CONFLICT (user_id, ' +
+                                          'connection_type) DO UPDATE SET ' +
+                                          'link = $4', uuid4(), user_id,
+                                          con_key, con_val)
 
         # No additions
         if main_query[-4:] == 'SET ':
@@ -480,7 +480,7 @@ async def rep(username: str):
         if not user:
             return no('Invalid authorization.')
 
-        if abs(amount) != 1 and not user['admin']:
+        if abs(amount) > 1 and not user['admin']:
             return no('Invalid amount.')
 
         target_user_id = await con.fetchval(
@@ -492,10 +492,10 @@ async def rep(username: str):
         await con.execute('DELETE FROM reputation_log WHERE ' +
                           'from_user_id = $1 AND to_user_id = $2', user['id'],
                           target_user_id)
-
-        await con.execute('INSERT INTO reputation_log (id, from_user_id, ' +
-                          'to_user_id, amount, message) ' +
-                          'VALUES ($1, $2, $3, $4, $5)', uuid4(), user['id'],
-                          target_user_id, amount, message)
+        if amount != 0:
+            await con.execute('INSERT INTO reputation_log (id, ' +
+                              'from_user_id, to_user_id, amount, message) ' +
+                              'VALUES ($1, $2, $3, $4, $5)', uuid4(),
+                              user['id'], target_user_id, amount, message)
 
         return {'success': True, 'message': ''}
