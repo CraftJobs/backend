@@ -477,6 +477,9 @@ async def rep(username: str):
     amount = json['amount']
     message = json['message']
 
+    if not isinstance(amount, int):
+        return no('Invalid amount.')
+
     if len(message) > 255:
         return no('Message cannot be more than 255 characters.')
 
