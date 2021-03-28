@@ -138,8 +138,13 @@ async def get_user(username: str):
             user_id)
 
         for connection_row in db_connections:
-            connections[connection_row['connection_type']] = \
-                connection_row['link']
+            con_type = connection_row['connection_type']
+            link = connection_row['link']
+
+            if con_type == 'EMAIL' and not authed_as:
+                link = 'sign in to view'
+
+            connections[con_type] = link
 
         user = {
             'avatarUrl': db_user['avatar_url'],
