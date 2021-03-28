@@ -217,6 +217,9 @@ def email_validator(link: str):
 
 
 def discord_validator(link: str):
+    if link.startswith('https://discord.gg/') or link.startswith('discord.gg/'):
+        return True
+
     # v  i  o  l  e  t  #  1  3  3  7
     #                   -5 -4 -3 -2 -1
     if link[-5] != '#':
@@ -242,7 +245,7 @@ def twitter_validator(link: str):
     return True
 
 
-ROLES = ['DEVELOPER', 'MANAGER', 'SYSADMIN', 'OTHER']
+ROLES = ['DEVELOPER', 'MANAGER', 'SYSADMIN', 'SERVER_OWNER', 'OTHER']
 RATE_RANGE_TYPES = ['HOURLY', 'FLAT']
 CONNECTION_VALIDATORS = {
     'GITHUB': github_validator,
