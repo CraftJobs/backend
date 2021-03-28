@@ -25,7 +25,7 @@ REP_LOG_QUERY = """SELECT
     users.username as from_username,
     users.full_name as from_full_name
 FROM reputation_log INNER JOIN users ON (users.id = from_user_id) 
-WHERE to_user_id = $1"""
+WHERE to_user_id = $1 ORDER BY time"""
 
 USER_BY_SESSION_QUERY = """SELECT
     user_id as id,

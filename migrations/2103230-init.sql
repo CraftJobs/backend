@@ -13,7 +13,7 @@ CREATE TABLE users (
     admin BOOL DEFAULT FALSE,
     alpha BOOL DEFAULT FALSE,
     description TEXT DEFAULT '',
-    created_at TIMESTAMP NOT NULL DEFAULT NOW()::timestamp
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE looking_for (
