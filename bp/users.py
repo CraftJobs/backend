@@ -503,6 +503,9 @@ async def rep(username: str):
         if not target_user_id:
             return no('User not found.')
 
+        if user['id'] == target_user_id:
+            return no('You cannot give yourself reputation.')
+
         await con.execute('DELETE FROM reputation_log WHERE ' +
                           'from_user_id = $1 AND to_user_id = $2', user['id'],
                           target_user_id)
