@@ -142,7 +142,7 @@ async def get_user(username: str):
             link = connection_row['link']
 
             if con_type == 'EMAIL' and not authed_as:
-                link = 'sign in to view'
+                link = '_unauthed'
 
             connections[con_type] = link
 
