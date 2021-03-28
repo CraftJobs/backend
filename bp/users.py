@@ -1,6 +1,6 @@
 from bp.blueprint import Blueprint
 from util.resp import no
-from quart import g, request as quart_rq, Request
+from quart import g, request as quart_rq, Request, jsonify
 from typing import Dict, List
 from uuid import uuid4
 from hashlib import md5
@@ -27,13 +27,27 @@ REP_LOG_QUERY = """SELECT
 FROM reputation_log INNER JOIN users ON (users.id = from_user_id) 
 WHERE to_user_id = $1"""
 
-
 USER_BY_SESSION_QUERY = """SELECT
     user_id as id,
     users.admin as admin,
     users.username as username
 FROM sessions INNER JOIN users ON (users.id = user_id) 
 WHERE token = $1
+"""
+
+LIST_USERS_BASE_QUERY = """
+SELECT 
+    username, 
+    full_name, 
+    admin, 
+    description,
+    created_at,
+    (
+        SELECT COALESCE(SUM(amount), 0)
+        FROM reputation_log 
+        WHERE to_user_id = users.id
+    ) as reputation
+FROM users
 """
 
 
@@ -499,3 +513,47 @@ async def rep(username: str):
                               user['id'], target_user_id, amount, message)
 
         return {'success': True, 'message': ''}
+
+
+QUERIES = {
+    'rep': 'ORDER BY reputation DESC',
+    'low': 'ORDER BY reputation ASC',
+    'old': 'ORDER BY created_at ASC',
+    'new': 'ORDER BY created_at DESC',
+    'adm': 'WHERE admin = TRUE ORDER BY created_at ASC',
+}
+
+
+@users_bp.route('/')
+async def list_users():
+    request: Request = quart_rq
+    category = 'rep'
+
+    if 'c' in request.args:
+        category = request.args['c']
+
+        if category not in QUERIES.keys():
+            category = 'rep'
+
+    query = LIST_USERS_BASE_QUERY + ' ' + QUERIES[category] + ' LIMIT 50'
+
+    users = []
+
+    async with g.pool.acquire() as con:
+        con: asyncpg.Connection = con
+
+        rows = await con.fetch(query)
+
+        for row in rows:
+            description = row['description']
+
+            if len(description) > 32:
+                description = description[:29] + '...'
+
+            users.append({'username': row['username'],
+                          'fullName': row['full_name'], 'admin': row['admin'],
+                          'partialDescription': description,
+                          'reputation': row['reputation'],
+                          'createdAt': row['created_at'].isoformat()})
+
+    return jsonify(users)
