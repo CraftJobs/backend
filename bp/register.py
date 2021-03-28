@@ -55,10 +55,6 @@ async def send_email_route():
             link = 'login/change-password?t='
             is_reset = True
 
-    await g.redis.setex(key + token, 600, email.lower())
-    await g.redis.setex('register:device_token:' + device_token, 600, token)
-    await g.redis.setex('ratelimit:register:send_mail:' + email.lower(), 600, 'a')
-
     http: http3.AsyncClient = g.http
     success = (await http.post('https://hcaptcha.com/siteverify', data={
         'response': json['captchaToken'],
@@ -78,6 +74,10 @@ async def send_email_route():
         else:
             email = await g.redis.get(key)
             await g.redis.delete(key)
+
+    await g.redis.setex(key + token, 600, email.lower())
+    await g.redis.setex('register:device_token:' + device_token, 600, token)
+    await g.redis.setex('ratelimit:register:send_mail:' + email.lower(), 600, 'a')
 
     if not (no_send_on_no_acc and not is_reset):
         send_mail(email, f'[CraftJobs] {title}',
