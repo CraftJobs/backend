@@ -32,7 +32,7 @@ def main():
     app.register_blueprint(users_bp)
 
 
-@app.before_first_request
+@app.before_serving
 async def second_main():
     global pool 
     global redis
@@ -105,6 +105,9 @@ async def second_main():
 
     sg = sendgrid.SendGridAPIClient(api_key=config['sg_key'])
 
+    loop = asyncio.get_event_loop()
+    loop.create_task(session_expirer())
+
 
 @app.before_request
 async def before():
@@ -118,6 +121,21 @@ async def before():
 def load_config():
     with open('config.json', 'r') as file:
         return json.load(file)
+
+
+async def session_expirer():
+    while True:
+        await asyncio.sleep(5)
+        async with pool.acquire() as con:
+            print('[session expirer] running session expirer')
+            con: asyncpg.Connection = con
+            rows = await con.fetch(
+                'DELETE FROM sessions WHERE expires_at <= NOW() RETURNING id, '
+                'expires_at')
+            for row in rows:
+                print(f'[session expirer] expired session {row["id"]} - '
+                      f'expired at {row["expires_at"]}')
+            print(f'[session expirer] expired {len(rows)} sessions')
 
 
 if __name__ == "__main__":
