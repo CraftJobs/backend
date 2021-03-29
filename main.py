@@ -127,7 +127,6 @@ async def session_expirer():
     while True:
         await asyncio.sleep(5)
         async with pool.acquire() as con:
-            print('[session expirer] running session expirer')
             con: asyncpg.Connection = con
             rows = await con.fetch(
                 'DELETE FROM sessions WHERE expires_at <= NOW() RETURNING id, '
@@ -135,7 +134,8 @@ async def session_expirer():
             for row in rows:
                 print(f'[session expirer] expired session {row["id"]} - '
                       f'expired at {row["expires_at"]}')
-            print(f'[session expirer] expired {len(rows)} sessions')
+            if len(rows) > 0:
+                print(f'[session expirer] expired {len(rows)} sessions')
 
 
 if __name__ == "__main__":
