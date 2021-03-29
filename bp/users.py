@@ -36,7 +36,7 @@ WHERE token = $1
 """
 
 LIST_USERS_BASE_QUERY = """
-SELECT 
+SELECT DISTINCT
     username, 
     full_name, 
     admin, 
@@ -535,6 +535,11 @@ QUERIES = {
     'old': 'ORDER BY created_at ASC',
     'new': 'ORDER BY created_at DESC',
     'adm': 'WHERE admin = TRUE ORDER BY created_at ASC',
+    'fol': 'WHERE id IN (SELECT following_user_id FROM following WHERE ' +
+           'follower_user_id = $1)',
+    'fpr': 'WHERE id IN (SELECT to_user_id FROM reputation_log WHERE ' +
+           'amount > 0 AND from_user_id IN (SELECT following_user_id FROM ' +
+           'following WHERE follower_user_id = $1)) ORDER BY reputation DESC'
 }
 
 
@@ -550,13 +555,24 @@ async def list_users():
             category = 'rep'
 
     query = LIST_USERS_BASE_QUERY + ' ' + QUERIES[category] + ' LIMIT 50'
+    query_args = []
 
     users = []
 
     async with g.pool.acquire() as con:
         con: asyncpg.Connection = con
 
-        rows = await con.fetch(query)
+        user_id = await con.fetchval(
+            'SELECT user_id FROM sessions WHERE token = $1',
+            request.headers.get('Authorization'))
+
+        if category == 'fol' or category == 'fpr':
+            if not user_id:
+                return no('invalid_session')
+            else:
+                query_args = [user_id]
+
+        rows = await con.fetch(query, *query_args)
 
         for row in rows:
             description = row['description']
