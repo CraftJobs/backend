@@ -567,8 +567,10 @@ async def list_users():
             request.headers.get('Authorization'))
 
         if category == 'fol' or category == 'fpr':
-            if not user_id:
-                return no('invalid_session')
+            if 'Authorization' not in request.headers:
+                return no('missing_authorization')
+            elif not user_id:
+                return no('invalid_authorization')
             else:
                 query_args = [user_id]
 
