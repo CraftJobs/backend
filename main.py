@@ -11,6 +11,7 @@ import http3
 import asyncio
 import os
 
+from bp.gk import gk_bp
 from bp.login import login_bp
 from bp.ping import ping_bp
 from bp.register import register_bp, register_debug_bp
@@ -26,6 +27,7 @@ http = None
 
 
 def main():
+    app.register_blueprint(gk_bp)
     app.register_blueprint(login_bp)
     app.register_blueprint(ping_bp)
     app.register_blueprint(register_bp)

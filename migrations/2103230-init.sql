@@ -39,3 +39,5 @@ CREATE TABLE connections (
     link TEXT NOT NULL,
     UNIQUE(user_id, connection_type)
 );
+
+CREATE INDEX expires_at_idx ON sessions (expires_at);
