@@ -140,13 +140,15 @@ async def finish():
     email = (await g.redis.get(email_token_key))
     if not email:
         return no('Invalid email token.')
-    email = email.decode('utf-8')
+    email: str = email.decode('utf-8')
 
     # Validate username
     if len(username) < 3:
         return no('Username must be at least 3 characters.')
     elif len(username) > 32:
         return no('Username must be at most 32 characters.')
+    elif 'CraftJobs' in username:
+        return no('Username cannot contain CraftJobs')
     else:
         for _, char in enumerate(username):
             if char not in VALID_USERNAME_CHARS:

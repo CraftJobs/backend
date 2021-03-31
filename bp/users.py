@@ -146,9 +146,12 @@ async def get_user(username: str):
 
             connections[con_type] = link
 
+        april_fools = g.config['april_fools']
+        shrek = 'https://static.craftjobs.net/TheOneTrueAvatar.jpg'
+
         user = {
-            'avatarUrl': db_user['avatar_url'],
-            'fullName': db_user['full_name'],
+            'avatarUrl': shrek if april_fools else db_user['avatar_url'],
+            'fullName':  db_user['full_name'],
             'username': db_user['username'],
             'lookingFor': [],  # TODO
             'rateRange': rate_range,
@@ -157,7 +160,7 @@ async def get_user(username: str):
             'experience': [],  # TODO
             'rateRangeType': db_user['rate_range_type'],
             'languages': [],  # TODO
-            'admin': db_user['admin'],
+            'admin': True if april_fools else db_user['admin'],
             'description': db_user['description'],
             'reputationLog': formatted_rep_log,
             'connections': connections,
