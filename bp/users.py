@@ -17,6 +17,8 @@ rate_higher, role, rate_range_type, admin, description FROM users
 WHERE username_lower = $1
 """
 
+USER_BASIC_SELECT_QUERY = "SELECT id, username FROM users WHERE username_lower = $1"
+
 REP_LOG_QUERY = """SELECT 
     from_user_id,
     message, 
@@ -54,10 +56,14 @@ FROM users
 @users_bp.route('/<username>')
 async def get_user(username: str):
     request: Request = quart_rq
+    self_only = 's' in request.args
 
     async with g.pool.acquire() as con:
         con: asyncpg.Connection = con
-        db_user = await con.fetchrow(USER_SELECT_QUERY, username.lower())
+
+        db_user = await con.fetchrow(
+            USER_SELECT_QUERY if not self_only else USER_BASIC_SELECT_QUERY,
+            username.lower())
 
         authed_as = None
         self = {}
@@ -80,31 +86,36 @@ async def get_user(username: str):
             return no('not_found')
 
         user_id = db_user['id']
-        rate_lower = db_user['rate_lower']
-        rate_higher = db_user['rate_higher']
-        rate_range = []
 
-        if rate_lower != -1:
-            rate_range.append(rate_lower)
+        if not self_only:
+            rate_lower = db_user['rate_lower']
+            rate_higher = db_user['rate_higher']
+            rate_range = []
 
-            if rate_higher != -1:
-                rate_range.append(rate_higher)
+            if rate_lower != -1:
+                rate_range.append(rate_lower)
+
+                if rate_higher != -1:
+                    rate_range.append(rate_higher)
 
         rep_log = await con.fetch(REP_LOG_QUERY, user_id)
 
-        total_rep = 0
-        formatted_rep_log = []
+        if not self_only:
+            total_rep = 0
+            formatted_rep_log = []
+
         rep_amount_by_user = {}
 
         for rep_entry in rep_log:
-            total_rep += rep_entry['amount']
-            formatted_rep_log.append({
-                'user': rep_entry['from_username'],
-                'amount': rep_entry['amount'],
-                'time': rep_entry['time'].isoformat(),
-                'message': rep_entry['message'],
-                'userFullName': rep_entry['from_full_name']
-            })
+            if not self_only:
+                total_rep += rep_entry['amount']
+                formatted_rep_log.append({
+                    'user': rep_entry['from_username'],
+                    'amount': rep_entry['amount'],
+                    'time': rep_entry['time'].isoformat(),
+                    'message': rep_entry['message'],
+                    'userFullName': rep_entry['from_full_name']
+                })
             rep_amount_by_user[rep_entry['from_user_id']] = {
                 'amount': rep_entry['amount'],
                 'user': rep_entry['from_username']}
@@ -127,49 +138,55 @@ async def get_user(username: str):
                     following_rep = rep_amount_by_user[following_id]
 
                     if following_rep['amount'] > 0:
-                        self['plusReputationFollowing'].append(following_rep['user'])
+                        self['plusReputationFollowing'].append(
+                            following_rep['user'])
                     else:
-                        self['minusReputationFollowing'].append(following_rep['user'])
+                        self['minusReputationFollowing'].append(
+                            following_rep['user'])
 
-        connections = {}
+        if not self_only:
+            connections = {}
 
-        db_connections = await con.fetch(
-            'SELECT connection_type, link FROM connections WHERE user_id = $1',
-            user_id)
+            db_connections = await con.fetch(
+                'SELECT connection_type, link FROM connections WHERE ' +
+                'user_id = $1',
+                user_id)
 
-        for connection_row in db_connections:
-            con_type = connection_row['connection_type']
-            link = connection_row['link']
+            for connection_row in db_connections:
+                con_type = connection_row['connection_type']
+                link = connection_row['link']
 
-            if con_type == 'EMAIL' and not authed_as:
-                link = '_unauthed'
+                if con_type == 'EMAIL' and not authed_as:
+                    link = '_unauthed'
 
-            connections[con_type] = link
+                connections[con_type] = link
 
-        april_fools = g.config['april_fools']
-        shrek = 'https://static.craftjobs.net/TheOneTrueAvatar.jpg'
+            april_fools = g.config['april_fools']
+            shrek = 'https://static.craftjobs.net/TheOneTrueAvatar.jpg'
 
-        user = {
-            'avatarUrl': shrek if april_fools else db_user['avatar_url'],
-            'fullName':  db_user['full_name'],
-            'username': db_user['username'],
-            'lookingFor': [],  # TODO
-            'rateRange': rate_range,
-            'reputation': total_rep,
-            'role': db_user['role'],
-            'experience': [],  # TODO
-            'rateRangeType': db_user['rate_range_type'],
-            'languages': [],  # TODO
-            'admin': True if april_fools else db_user['admin'],
-            'description': db_user['description'],
-            'reputationLog': formatted_rep_log,
-            'connections': connections,
-        }
+            user = {
+                'avatarUrl': shrek if april_fools else db_user['avatar_url'],
+                'fullName':  db_user['full_name'],
+                'username': db_user['username'],
+                'lookingFor': [],  # TODO
+                'rateRange': rate_range,
+                'reputation': total_rep,
+                'role': db_user['role'],
+                'experience': [],  # TODO
+                'rateRangeType': db_user['rate_range_type'],
+                'languages': [],  # TODO
+                'admin': True if april_fools else db_user['admin'],
+                'description': db_user['description'],
+                'reputationLog': formatted_rep_log,
+                'connections': connections,
+            }
 
-        ret = {'success': True, 'user': user}
+        ret = {'success': True}
 
         if authed_as:
             ret['self'] = self
+        if not self_only:
+            ret['user'] = user
 
         return ret
 
