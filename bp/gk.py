@@ -3,7 +3,7 @@ from quart import request, g
 
 gk_bp = Blueprint('gk', __name__)
 
-VALID_FIELDS = ['admin', 'alpha']  # Prevent SQLi
+VALID_FIELDS = ['admin', 'alpha', 'omi_admin']  # Prevent SQLi
 
 
 @gk_bp.route('/check', methods=['POST'])
@@ -22,8 +22,12 @@ async def check():
         return {'valid': False, 'field': False}
 
     async with g.pool.acquire() as con:
-        field = await con.fetchval(f'SELECT u.{field} FROM sessions INNER '
-                                   'JOIN users u on sessions.user_id = u.id '
-                                   'WHERE token = $1', token)
+        row = await con.fetchrow(f'SELECT u.{field} as {field}, u.id as id  '
+                                 f'FROM sessions INNER JOIN users u ON '
+                                 f'sessions.user_id = u.id WHERE token = $1',
+                                 token)
 
-        return {'valid': True, 'field': field}
+        if not row:
+            return {'valid': False, 'field': False}
+
+        return {'valid': True, 'field': field[field]}
