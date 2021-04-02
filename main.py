@@ -145,5 +145,4 @@ if __name__ == "__main__":
     main()
     config = Config()
     config.bind = 'localhost:7085'
-    config.keep_alive_timeout = 1
     asyncio.run(serve(app, config))
