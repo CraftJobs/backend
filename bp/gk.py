@@ -30,4 +30,4 @@ async def check():
         if not row:
             return {'valid': False, 'field': False}
 
-        return {'valid': True, 'field': field[field]}
+        return {'valid': True, 'field': row[field]}
